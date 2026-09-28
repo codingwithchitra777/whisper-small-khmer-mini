@@ -3,7 +3,8 @@
 Final project for an AI course (brief: `docs/FinalProject.png`, due 2026-10-05): a Khmer
 speech-to-subtitles web app with a fine-tuned `openai/whisper-small`. It is a slimmed-down copy
 of the thesis project at `C:\workspace_thesis` (which trains on a much larger dataset) — keep the
-two separate; don't import from the thesis code. Not a git repository.
+two separate; don't import from the thesis code. Git repo: `github.com/codingwithchitra777/whisper-small-khmer-mini` (`main`);
+data parquet, `models/` and `outputs/` are gitignored.
 
 ## Layout and commands
 
