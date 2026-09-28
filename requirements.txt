@@ -1,0 +1,20 @@
+# Local: dataset build, evaluation, and the demo (FastAPI backend). Python 3.12.
+torch
+transformers==4.57.6
+accelerate
+evaluate
+jiwer
+numpy
+pandas
+pyarrow
+scipy
+soundfile
+tensorboard
+tqdm
+
+# Subtitle API
+fastapi==0.111.0
+uvicorn[standard]==0.29.0
+python-multipart==0.0.9
+pydantic==2.7.1
+yt-dlp

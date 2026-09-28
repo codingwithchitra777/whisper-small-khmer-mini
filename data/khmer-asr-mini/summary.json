@@ -1,0 +1,83 @@
+{
+  "splits": {
+    "train": {
+      "clips": 20758,
+      "hours": 15.99,
+      "per_source": {
+        "kheng_info": 2832,
+        "km_speech_corpus": 13411,
+        "mpwt": 1834,
+        "openslr42": 2606,
+        "rfi_manual": 75
+      }
+    },
+    "validation": {
+      "clips": 1150,
+      "hours": 0.93,
+      "per_source": {
+        "kheng_info": 133,
+        "km_speech_corpus": 744,
+        "mpwt": 104,
+        "openslr42": 165,
+        "rfi_manual": 4
+      }
+    },
+    "test": {
+      "clips": 1179,
+      "hours": 0.92,
+      "per_source": {
+        "kheng_info": 132,
+        "km_speech_corpus": 788,
+        "mpwt": 120,
+        "openslr42": 135,
+        "rfi_manual": 4
+      }
+    },
+    "ddd_test": {
+      "clips": 2034,
+      "hours": 4.66,
+      "per_source": {
+        "ddd_test": 2034
+      }
+    }
+  },
+  "sources": {
+    "openslr42": {
+      "clips": 2906,
+      "hours": 3.97,
+      "license": "CC-BY-SA-4.0",
+      "origin": "OpenSLR 42 (https://openslr.org/42/), 1 male speaker, word-segmented text"
+    },
+    "km_speech_corpus": {
+      "clips": 14943,
+      "hours": 10.41,
+      "license": "CC-BY-4.0",
+      "origin": "https://huggingface.co/datasets/seanghay/km-speech-corpus"
+    },
+    "kheng_info": {
+      "clips": 3097,
+      "hours": 1.46,
+      "license": "research use only",
+      "origin": "https://huggingface.co/datasets/seanghay/khmer_kheng_info_speech (single words, kheng.info)"
+    },
+    "mpwt": {
+      "clips": 2058,
+      "hours": 1.9,
+      "license": "research use only",
+      "origin": "https://huggingface.co/datasets/seanghay/khmer_mpwt_speech (Ministry of Public Works and Transport app)"
+    },
+    "rfi_manual": {
+      "clips": 83,
+      "hours": 0.11,
+      "license": "own collection (RFI Khmer audio)",
+      "origin": "Clips cut and transcribed by hand from RFI Khmer news"
+    }
+  },
+  "dropped": {
+    "unreadable": 0,
+    "empty_text_or_bad_length": 0,
+    "over_label_token_limit": 0,
+    "text_also_in_ddd_test": 0
+  },
+  "openslr_spaces_removed": true
+}

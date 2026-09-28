@@ -1,0 +1,12 @@
+# Kaggle / cloud GPU training. Resuming a checkpoint needs torch >= 2.6 (CVE-2025-32434 guard in transformers).
+torch>=2.6
+transformers==4.57.6
+accelerate>=1.1
+evaluate
+jiwer
+pandas
+pyarrow>=15
+scipy
+soundfile
+tensorboard
+tqdm

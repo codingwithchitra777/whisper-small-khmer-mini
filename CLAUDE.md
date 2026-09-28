@@ -1,0 +1,28 @@
+# CLAUDE.md
+
+Final project for an AI course (brief: `docs/FinalProject.png`, due 2026-10-05): a Khmer
+speech-to-subtitles web app with a fine-tuned `openai/whisper-small`. It is a slimmed-down copy
+of the thesis project at `C:\workspace_thesis` (which trains on a much larger dataset) — keep the
+two separate; don't import from the thesis code. Not a git repository.
+
+## Layout and commands
+
+- `src/` is a package run with `python -m src.<module>` from the project root (no sys.path hacks).
+  - `config.py` — all paths and the dataset source list (`SOURCES`, with licenses). Raw audio is
+    read from the thesis workspace (`KHMER_SOURCE_ROOT`).
+  - `speech.py` — shared audio/text/feature/metric helpers. Resampling uses
+    `scipy.signal.resample_poly`; don't switch back to librosa (0.10 fails to import without
+    `pkg_resources`).
+  - `build_dataset.py` → `data/khmer-asr-mini/` (parquet, FLAC bytes). Splits are assigned by
+    hashing each sentence's text, so a sentence never appears in two splits; training drops any
+    sentence also in `ddd_test`. Preserve both properties if you change it.
+  - `train.py` (`--sources` = ablation, `--time-limit-hours` + `--resume` for Kaggle's 12 h
+    sessions; resume needs torch >= 2.6), `evaluate.py` (`--split test|ddd_test|validation`).
+- `kaggle/package.py` builds the data and code zips; `kaggle/train_khmer_whisper.ipynb` runs
+  smoke / train / ablation / evaluate on Kaggle T4 ×2. If you add a module under `src/`, it is
+  packaged automatically (all `src/*.py`).
+- `api/main.py` (FastAPI) loads `models/whisper-small-khmer-mini` or `KHMER_MODEL_DIR`; it cuts
+  audio at pauses into ≤15 s chunks because Khmer uses ~400 Whisper tokens per 15 s against the
+  448-token decoder limit. `webapp/` is the Next.js front end (proxies to the API on port 8000).
+
+Khmer transcripts: compare with `cer_no_space` (spacing is inconsistent across sources).

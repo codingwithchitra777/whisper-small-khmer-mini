@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+py-venv/
+.venv/
+webapp/node_modules/
+webapp/.next/
+.idea/
+
+# Large artifacts: rebuilt with src/build_dataset.py or downloaded from Kaggle
+data/khmer-asr-mini/*.parquet
+models/
+outputs/
