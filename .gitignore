@@ -4,6 +4,7 @@ py-venv/
 .venv/
 webapp/node_modules/
 webapp/.next/
+webapp/next-env.d.ts
 .idea/
 
 # Large artifacts: rebuilt with src/build_dataset.py or downloaded from Kaggle
