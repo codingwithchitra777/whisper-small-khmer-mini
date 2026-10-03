@@ -190,12 +190,16 @@ the back end at start-up.*
 When a user submits a YouTube link, the back end (`api/main.py`) runs these steps:
 
 1. **Download.** yt-dlp and ffmpeg download the video's audio track and convert it to 16 kHz mono WAV.
-2. **Split at pauses.** Khmer is expensive in Whisper's vocabulary: about 400 tokens for 15 seconds of speech,
-   against a decoder limit of 448 tokens. A standard 30-second window would therefore be cut off mid-sentence.
-   We split the audio into chunks of at most 15 seconds, cutting at the quietest pause (at least ~200 ms of low
-   energy) so that words are not split in half. Silent chunks are skipped, which prevents the model from
-   inventing text for silence.
-3. **Transcribe.** Each chunk is transcribed by the fine-tuned model with timestamps enabled.
+2. **Split at pauses.** Khmer is expensive in Whisper's vocabulary: about 400 tokens for 15 seconds of read
+   speech, and more for fast news delivery, against a decoder limit of 448 tokens. A standard 30-second window
+   would therefore be cut off mid-sentence. We split the audio into chunks of at most 10 seconds, each ending at
+   a pause (at least ~200 ms of low energy) so that words are not split in half. We first used 15-second
+   chunks, but on a real news video the endings of fast sentences still came out garbled; 10-second chunks
+   removed that and gave shorter, easier-to-read subtitle lines. Silent chunks are skipped, which prevents the
+   model from inventing text for silence.
+3. **Transcribe.** The fine-tuned model transcribes the chunks eight at a time, with timestamps enabled, in
+   half precision on the GPU. Batching matters on a laptop GPU, where the fixed cost of each decoding step
+   dominates: it made transcription about 2.5 times faster.
 4. **Assemble.** Each segment's timestamps are shifted by its chunk's position in the video and returned as a
    list of (start, end, text) segments.
 

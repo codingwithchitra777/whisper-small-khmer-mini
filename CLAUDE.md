@@ -27,7 +27,11 @@ data parquet, `models/` and `outputs/` are gitignored.
   setup / smoke / train / ablation / evaluate / pack on one GPU under `/workspace`, with long
   runs in the background (logs in `/workspace/logs`).
 - `api/main.py` (FastAPI) loads `models/whisper-small-khmer-mini` or `KHMER_MODEL_DIR`; it cuts
-  audio at pauses into ≤15 s chunks because Khmer uses ~400 Whisper tokens per 15 s against the
-  448-token decoder limit. `webapp/` is the Next.js front end (proxies to the API on port 8000).
+  audio at pauses into ≤10 s chunks because Khmer uses ~400 Whisper tokens per 15 s of read speech
+  (more for fast news) against the 448-token decoder limit; 15 s chunks garbled sentence endings.
+  Chunks are transcribed 8 per `generate()` call in fp16 on GPU (per-token overhead dominates on a
+  laptop GPU). `webapp/` is the Next.js front end (proxies to the API on port 8000). Public demo:
+  `tools/cloudflared.exe tunnel --url http://localhost:3000` (quick tunnel; Cloudflare cuts
+  requests at 100 s, so videos over ~4.5 min fail until `/process` becomes job-based).
 
 Khmer transcripts: compare with `cer_no_space` (spacing is inconsistent across sources).

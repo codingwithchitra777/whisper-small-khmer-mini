@@ -36,11 +36,12 @@ MODEL_DIR = Path(os.environ.get("KHMER_MODEL_DIR", PROJECT_ROOT / "models" / "wh
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 SAMPLING_RATE = 16_000
-# Whisper's decoder holds 448 tokens, and Khmer tokenizes long (~400 tokens per 15 s of speech),
-# so a full 30 s window gets cut off mid-transcript. Chunks stay at or under 15 s and are cut at
-# the quietest pause between 8 s and 15 s, so words aren't split and no overlap is needed.
+# Whisper's decoder holds 448 tokens, and Khmer tokenizes long (~400 tokens per 15 s of read
+# speech, more for fast news delivery), so a full 30 s window gets cut off mid-transcript. Chunks
+# stay at or under 10 s (15 s still garbled the endings of fast newsreader sentences) and end at a
+# pause, so words aren't split and no overlap is needed.
 MIN_CHUNK_SECONDS = 2
-MAX_CHUNK_SECONDS = 15
+MAX_CHUNK_SECONDS = 10
 PAUSE_RELATIVE_RMS = 0.1   # a "pause" is quieter than 10% of the window's median loudness
 MAX_NEW_TOKENS = 440       # 448 minus the 4 prompt tokens, with a little room
 # Khmer runs ~27 tokens/s of speech; capping each chunk near what its length needs stops a
@@ -341,7 +342,7 @@ async def process_youtube(request: ProcessRequest) -> ProcessResponse:
     """
     Main endpoint:
     1. Download audio from YouTube URL via yt-dlp (16kHz mono WAV).
-    2. Split at pauses into chunks of at most 15 s.
+    2. Split at pauses into chunks of at most 10 s.
     3. Transcribe each chunk with return_timestamps=True.
     4. Assemble timestamped Khmer segments.
     """
