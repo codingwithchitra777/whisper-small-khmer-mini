@@ -6,6 +6,7 @@ webapp/node_modules/
 webapp/.next/
 webapp/next-env.d.ts
 .idea/
+tools/
 
 # Large artifacts: rebuilt with src/build_dataset.py or downloaded from Kaggle
 data/khmer-asr-mini/*.parquet
