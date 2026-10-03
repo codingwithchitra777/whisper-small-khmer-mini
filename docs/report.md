@@ -180,8 +180,12 @@ We fine-tune all 241 million parameters (no frozen layers or adapters), using th
 The application has two parts: a Next.js web front end and a FastAPI back end that hosts the fine-tuned model.
 The front end forwards requests to the API, which runs on the same machine.
 
-> [Add a system architecture diagram here: Browser → Next.js front end → FastAPI back end → (yt-dlp + ffmpeg) →
-> pause-based chunking → fine-tuned Whisper → timestamped segments → back to the browser.]
+![System architecture: the viewer's browser sends a YouTube URL to the Next.js web app, which proxies it to the
+FastAPI back end; the back end downloads the audio, splits it at pauses, transcribes it with the fine-tuned
+Whisper-small model and returns timestamped segments.](figures/system-architecture.png)
+
+*Figure 1. System architecture. The fine-tuned model (highlighted) is trained offline on RunPod and loaded by
+the back end at start-up.*
 
 When a user submits a YouTube link, the back end (`api/main.py`) runs these steps:
 
