@@ -76,6 +76,9 @@ def build_model(args) -> WhisperForConditionalGeneration:
     model.config.forced_decoder_ids = None
     if args.gradient_checkpointing:
         model.config.use_cache = False
+        # Non-reentrant: the default (reentrant) mode backpropagates through the encoder graph once per
+        # decoder layer (encoder_hidden_states is passed by keyword) and fails on the second layer.
+        model.gradient_checkpointing_enable(gradient_checkpointing_kwargs={"use_reentrant": False})
     return model
 
 
@@ -135,7 +138,6 @@ def main() -> None:
         num_train_epochs=args.epochs,
         bf16=use_bf16,
         fp16=torch.cuda.is_available() and not use_bf16,
-        gradient_checkpointing=args.gradient_checkpointing,
         eval_strategy="steps",
         eval_steps=args.eval_steps,
         save_steps=args.eval_steps,

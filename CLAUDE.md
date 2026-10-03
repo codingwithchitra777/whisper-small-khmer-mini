@@ -22,6 +22,10 @@ data parquet, `models/` and `outputs/` are gitignored.
 - `kaggle/package.py` builds the data and code zips; `kaggle/train_khmer_whisper.ipynb` runs
   smoke / train / ablation / evaluate on Kaggle T4 ×2. If you add a module under `src/`, it is
   packaged automatically (all `src/*.py`).
+- `runpod/` is the RunPod alternative, independent of `kaggle/`: `runpod/package.py` builds the
+  zips into `outputs/runpod/` (code zip includes `runpod/run.sh`); `runpod/run.sh` runs
+  setup / smoke / train / ablation / evaluate / pack on one GPU under `/workspace`, with long
+  runs in the background (logs in `/workspace/logs`).
 - `api/main.py` (FastAPI) loads `models/whisper-small-khmer-mini` or `KHMER_MODEL_DIR`; it cuts
   audio at pauses into ≤15 s chunks because Khmer uses ~400 Whisper tokens per 15 s against the
   448-token decoder limit. `webapp/` is the Next.js front end (proxies to the API on port 8000).
