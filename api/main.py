@@ -9,6 +9,7 @@ issues with this fine-tuned model's generation_config.json.
 
 import math
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -42,6 +43,12 @@ MIN_CHUNK_SECONDS = 2
 MAX_CHUNK_SECONDS = 15
 PAUSE_RELATIVE_RMS = 0.1   # a "pause" is quieter than 10% of the window's median loudness
 MAX_NEW_TOKENS = 440       # 448 minus the 4 prompt tokens, with a little room
+# Khmer runs ~27 tokens/s of speech; capping each chunk near what its length needs stops a
+# repetition loop early instead of letting it run to MAX_NEW_TOKENS.
+BATCH_SIZE = 8             # chunks transcribed per generate() call (~1.5 GB of GPU memory in fp16)
+TOKENS_PER_SECOND = 40
+TOKEN_MARGIN = 24
+REPEAT_RUN = re.compile(r"(.{2,15}?)\1{2,}")  # the same 2–15 chars 3+ times in a row (a decoding loop)
 FRAME_SECONDS = 0.02       # energy frame for pause detection
 PAUSE_SMOOTHING_FRAMES = 10  # look for ~200 ms of quiet, not a single quiet frame
 SILENCE_RMS = 1e-3         # chunks quieter than this are skipped (avoids hallucinated text)
@@ -65,7 +72,9 @@ async def lifespan(app: FastAPI):
     print(f"[INFO] Loading Khmer Whisper model from {MODEL_DIR} on {device_label}...")
 
     processor = WhisperProcessor.from_pretrained(str(MODEL_DIR))
-    model = WhisperForConditionalGeneration.from_pretrained(str(MODEL_DIR)).to(device)
+    # fp16 on the GPU roughly halves transcription time; CPU stays fp32 (fp16 is slow there).
+    dtype = torch.float16 if torch.cuda.is_available() else torch.float32
+    model = WhisperForConditionalGeneration.from_pretrained(str(MODEL_DIR), dtype=dtype).to(device)
     model.eval()
 
     # ── Patch generation_config for newer transformers compatibility ──────────
@@ -175,6 +184,11 @@ def _download_audio(url: str, tmp_dir: Path) -> Path:
     return audio_path
 
 
+def _clean_text(text: str) -> str:
+    """Collapse decoding loops to one copy and drop the broken character a cut-off token leaves."""
+    return REPEAT_RUN.sub(r"\1", text.replace("�", "")).strip()
+
+
 def _split_on_pauses(audio_array: np.ndarray) -> list[tuple[int, int]]:
     """
     Split audio into (start, end) sample ranges of at most MAX_CHUNK_SECONDS. Each chunk ends at
@@ -238,19 +252,24 @@ def _transcribe_with_timestamps(audio_path: Path) -> list[dict]:
 
     segments: list[dict] = []
 
-    for start_sample, end_sample in _split_on_pauses(audio_array):
-        chunk = audio_array[start_sample:end_sample]
-        if np.sqrt(np.mean(chunk ** 2)) < SILENCE_RMS:
-            continue
-        chunk_offset_sec = start_sample / SAMPLING_RATE
-        chunk_end_sec = min(end_sample / SAMPLING_RATE, total_duration)
+    # (start s, end s, samples) for every chunk with sound in it
+    chunks = [
+        (start / SAMPLING_RATE, min(end / SAMPLING_RATE, total_duration), audio_array[start:end])
+        for start, end in _split_on_pauses(audio_array)
+        if np.sqrt(np.mean(audio_array[start:end] ** 2)) >= SILENCE_RMS
+    ]
 
-        # Prepare features
+    # Chunks are transcribed BATCH_SIZE at a time: generation is one forward pass per token, and on a
+    # laptop GPU the per-pass overhead dominates, so a batch costs about the same time as one chunk.
+    for batch_start in range(0, len(chunks), BATCH_SIZE):
+        batch = chunks[batch_start : batch_start + BATCH_SIZE]
         input_features = processor(
-            chunk,
+            [samples for _, _, samples in batch],
             sampling_rate=SAMPLING_RATE,
             return_tensors="pt",
-        ).input_features.to(device)
+        ).input_features.to(device, dtype=model.dtype)
+        longest = max(end - start for start, end, _ in batch)
+        token_cap = min(MAX_NEW_TOKENS, int(longest * TOKENS_PER_SECOND) + TOKEN_MARGIN)
 
         with torch.no_grad():
             # return_timestamps produces token-level timestamps decoded as segments
@@ -258,17 +277,15 @@ def _transcribe_with_timestamps(audio_path: Path) -> list[dict]:
                 input_features,
                 language="khmer",
                 return_timestamps=True,
-                max_new_tokens=MAX_NEW_TOKENS,
+                max_new_tokens=token_cap,
             )
 
-        # Decode with timestamps — returns list of dicts [{timestamp, text}]
+        # One {"text", "offsets": [{"text", "timestamp": (start, end)}]} per chunk; times are chunk-relative
         result = processor.tokenizer.batch_decode(
             predicted_ids, skip_special_tokens=True, output_offsets=True
         )
 
-        # batch_decode with output_with_offsets returns a list of dicts per item
-        # Each item has "text" and optionally "offsets" list
-        for item in result:
+        for (chunk_offset_sec, chunk_end_sec, _), item in zip(batch, result):
             offsets = item.get("offsets", [])
             if offsets:
                 for seg in offsets:
@@ -277,7 +294,7 @@ def _transcribe_with_timestamps(audio_path: Path) -> list[dict]:
                     # A missing end timestamp means the segment runs to the end of the chunk
                     seg_end = chunk_end_sec if raw_ts[1] is None else raw_ts[1] + chunk_offset_sec
                     seg_end = min(seg_end, chunk_end_sec)
-                    text = seg.get("text", "").strip()
+                    text = _clean_text(seg.get("text", ""))
                     if text:
                         segments.append({
                             "start": round(seg_start, 2),
@@ -286,7 +303,7 @@ def _transcribe_with_timestamps(audio_path: Path) -> list[dict]:
                         })
             else:
                 # No offsets — treat entire chunk as one segment
-                full_text = item.get("text", "").strip()
+                full_text = _clean_text(item.get("text", ""))
                 if full_text:
                     segments.append({
                         "start": round(chunk_offset_sec, 2),
