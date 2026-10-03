@@ -9,4 +9,7 @@ webapp/.next/
 # Large artifacts: rebuilt with src/build_dataset.py or downloaded from Kaggle
 data/khmer-asr-mini/*.parquet
 models/
-outputs/
+outputs/*
+# ...except the small result files the report's numbers come from
+!outputs/evaluation/
+!outputs/training/
