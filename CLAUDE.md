@@ -31,7 +31,9 @@ data parquet, `models/` and `outputs/` are gitignored.
   (more for fast news) against the 448-token decoder limit; 15 s chunks garbled sentence endings.
   Chunks are transcribed 8 per `generate()` call in fp16 on GPU (per-token overhead dominates on a
   laptop GPU). `webapp/` is the Next.js front end (proxies to the API on port 8000). Public demo:
-  `tools/cloudflared.exe tunnel --url http://localhost:3000` (quick tunnel; Cloudflare cuts
-  requests at 100 s, so videos over ~4.5 min fail until `/process` becomes job-based).
+  `tools/cloudflared.exe tunnel --url http://localhost:3000` (quick tunnel). Cloudflare cuts any
+  request at 100 s, so the page uses background jobs: `POST /jobs` returns at once, the page polls
+  `GET /jobs/{id}` (status, chunks done/total, segments). One worker thread runs jobs in order (one
+  GPU); jobs live in memory for an hour. `/process` still exists but waits for the whole video.
 
 Khmer transcripts: compare with `cer_no_space` (spacing is inconsistent across sources).

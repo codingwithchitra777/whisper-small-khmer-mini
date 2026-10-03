@@ -13,71 +13,123 @@ function formatDuration(seconds: number): string {
   return `${m}m ${s}s`;
 }
 
+// ── Backend job (see api/main.py: POST /jobs, GET /jobs/{id}) ─────────────────
+interface Job {
+  job_id: string;
+  status: "queued" | "downloading" | "transcribing" | "done" | "error";
+  queue_position: number;
+  chunks_done: number;
+  chunks_total: number;
+  duration_seconds: number | null;
+  segments: Segment[];
+  error: string | null;
+}
+
+const POLL_MS = 2_000;
+const MAX_POLL_FAILURES = 5; // tolerate brief network blips before giving up
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function readJson(res: Response) {
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error ?? `Server error (${res.status})`);
+  return data;
+}
+
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function HomePage() {
   const [url, setUrl]           = useState("");
   const [step, setStep]         = useState<Step>("idle");
+  const [detail, setDetail]     = useState<string | null>(null);
+  const [fraction, setFraction] = useState<number | null>(null);
   const [segments, setSegments] = useState<Segment[]>([]);
   const [videoId, setVideoId]   = useState<string | null>(null);
   const [duration, setDuration] = useState<number | null>(null);
   const [error, setError]       = useState<string | null>(null);
 
   const inputRef = useRef<HTMLInputElement>(null);
+  // Bumped on every submit/reset so a stale polling loop stops updating the page.
+  const runRef = useRef(0);
+
+  // Map the backend's job status onto the progress steps.
+  const showJob = (job: Job) => {
+    if (job.status === "queued") {
+      setStep("downloading");
+      setDetail(job.queue_position > 0 ? `Waiting in queue (${job.queue_position} ahead)…` : "Starting…");
+    } else if (job.status === "downloading") {
+      setStep("downloading");
+      setDetail("Downloading audio from YouTube…");
+    } else if (job.status === "transcribing") {
+      if (job.duration_seconds != null) setDuration(job.duration_seconds);
+      if (job.chunks_total === 0) {
+        setStep("extracting");
+        setDetail("Splitting the audio at pauses…");
+      } else {
+        setStep("transcribing");
+        setFraction(job.chunks_done / job.chunks_total);
+        setDetail(`Transcribing ${job.chunks_done} / ${job.chunks_total} chunks`);
+      }
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const trimmed = url.trim();
     if (!trimmed) return;
 
-    // Reset state
+    const run = ++runRef.current;
     setError(null);
     setSegments([]);
     setDuration(null);
-
-    // Extract and show YouTube embed immediately
-    const vid = extractVideoId(trimmed);
-    setVideoId(vid);
-
-    // Step 1 — Downloading
+    setFraction(null);
+    setVideoId(extractVideoId(trimmed)); // show the video right away
     setStep("downloading");
+    setDetail("Starting…");
 
     try {
-      // Steps are simulated on the frontend while the backend does real work
-      // Backend combines download + extract + transcribe into one call
-      const progressTimeout1 = setTimeout(() => setStep("extracting"),   3_000);
-      const progressTimeout2 = setTimeout(() => setStep("transcribing"), 7_000);
+      // The backend works in the background; each request here returns quickly, so long
+      // videos never hit a proxy's request time limit (Cloudflare: 100 s).
+      let job: Job = await readJson(
+        await fetch("/api/jobs", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url: trimmed }),
+        })
+      );
 
-      const res = await fetch("/api/process", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: trimmed }),
-      });
-
-      clearTimeout(progressTimeout1);
-      clearTimeout(progressTimeout2);
-
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error ?? `Server error (${res.status})`);
+      let failures = 0;
+      while (job.status !== "done" && job.status !== "error") {
+        if (run !== runRef.current) return;
+        showJob(job);
+        await sleep(POLL_MS);
+        try {
+          job = await readJson(await fetch(`/api/jobs/${job.job_id}`, { cache: "no-store" }));
+          failures = 0;
+        } catch (pollError) {
+          if (++failures >= MAX_POLL_FAILURES) throw pollError;
+        }
       }
+      if (run !== runRef.current) return;
 
-      const data = await res.json();
-
-      if (!data.success) {
-        throw new Error(data.error ?? "Transcription failed");
-      }
-
-      setSegments(data.segments ?? []);
-      setDuration(data.duration_seconds ?? null);
+      if (job.status === "error") throw new Error(job.error ?? "Transcription failed");
+      setSegments(job.segments ?? []);
+      setDuration(job.duration_seconds ?? null);
+      setFraction(null);
+      setDetail(null);
       setStep("done");
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Unknown error occurred";
-      setError(msg);
+      if (run !== runRef.current) return;
+      setError(err instanceof Error ? err.message : "Unknown error occurred");
+      setDetail(null);
+      setFraction(null);
       setStep("error");
     }
   };
 
   const handleReset = () => {
+    runRef.current++;
+    setDetail(null);
+    setFraction(null);
     setUrl("");
     setStep("idle");
     setSegments([]);
@@ -163,7 +215,7 @@ export default function HomePage() {
       </form>
 
       {/* ── Progress ─────────────────────────────────────────────────────── */}
-      <ProgressSteps step={step} />
+      <ProgressSteps step={step} detail={detail} fraction={fraction} />
 
       {/* ── Error ────────────────────────────────────────────────────────── */}
       {step === "error" && error && (

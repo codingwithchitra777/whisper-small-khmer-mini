@@ -1,13 +1,12 @@
 import { NextRequest } from "next/server";
 import { callBackend } from "../../../lib/backend";
 
-// One-shot endpoint (waits for the whole video). The page uses /api/jobs instead, because proxies
-// such as Cloudflare close requests after 100 s.
+// Queue a YouTube URL; answers at once with { job_id, status, ... }.
 export async function POST(request: NextRequest) {
   const body = await request.json();
   return callBackend(
-    "/process",
+    "/jobs",
     { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) },
-    600_000 // downloading + transcribing can take a few minutes
+    30_000
   );
 }

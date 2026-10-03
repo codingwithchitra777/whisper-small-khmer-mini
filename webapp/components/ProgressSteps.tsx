@@ -4,6 +4,10 @@ export type Step = "idle" | "downloading" | "extracting" | "transcribing" | "don
 
 interface ProgressStepsProps {
   step: Step;
+  /** Live detail under the steps, e.g. "Transcribing 12 / 40 chunks". */
+  detail?: string | null;
+  /** 0–1 while transcribing; draws a progress bar. */
+  fraction?: number | null;
 }
 
 const STEPS: { key: Step; icon: string; label: string }[] = [
@@ -24,7 +28,7 @@ function getStepStatus(stepKey: Step, currentStep: Step): "idle" | "active" | "d
   return "idle";
 }
 
-export default function ProgressSteps({ step }: ProgressStepsProps) {
+export default function ProgressSteps({ step, detail, fraction }: ProgressStepsProps) {
   if (step === "idle") return null;
 
   return (
@@ -42,6 +46,30 @@ export default function ProgressSteps({ step }: ProgressStepsProps) {
           );
         })}
       </div>
+      {fraction != null && step === "transcribing" && (
+        <div
+          role="progressbar"
+          aria-label="Transcription progress"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={Math.round(fraction * 100)}
+          style={{ height: 6, borderRadius: 3, background: "rgba(255,255,255,0.08)", marginTop: "1rem", overflow: "hidden" }}
+        >
+          <div
+            style={{
+              width: `${Math.round(fraction * 100)}%`,
+              height: "100%",
+              background: "var(--accent-gradient)",
+              transition: "width 0.4s ease",
+            }}
+          />
+        </div>
+      )}
+      {detail && step !== "done" && (
+        <p style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginTop: "0.6rem", textAlign: "center" }}>
+          {detail}
+        </p>
+      )}
     </div>
   );
 }

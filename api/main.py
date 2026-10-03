@@ -14,9 +14,13 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
+import time
+import uuid
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 import numpy as np
 import soundfile as sf
@@ -134,6 +138,17 @@ class ProcessResponse(BaseModel):
     duration_seconds: Optional[float] = None
 
 
+class JobResponse(BaseModel):
+    job_id: str
+    status: str                       # queued | downloading | transcribing | done | error
+    queue_position: int = 0           # jobs ahead of this one (queued status only)
+    chunks_done: int = 0
+    chunks_total: int = 0
+    duration_seconds: Optional[float] = None
+    segments: list[Segment] = []
+    error: Optional[str] = None
+
+
 # ── Helpers ───────────────────────────────────────────────────────────────────
 def _get_ytdlp_cmd() -> str:
     """Return the yt-dlp executable path (venv or system PATH)."""
@@ -221,12 +236,15 @@ def _split_on_pauses(audio_array: np.ndarray) -> list[tuple[int, int]]:
     return ranges
 
 
-def _transcribe_with_timestamps(audio_path: Path) -> list[dict]:
+def _transcribe_with_timestamps(
+    audio_path: Path, on_progress: Optional[Callable[[int, int], None]] = None
+) -> list[dict]:
     """
     Transcribe audio using the fine-tuned Whisper model with segment timestamps.
 
     Splits long audio at pauses into chunks of at most MAX_CHUNK_SECONDS, transcribes each with
-    return_timestamps=True, and assembles the results with corrected offsets.
+    return_timestamps=True, and assembles the results with corrected offsets. `on_progress` is
+    called with (chunks done, total chunks) after each batch.
     """
     if processor is None or model is None or device is None:
         raise HTTPException(status_code=503, detail="Model not loaded. Try again shortly.")
@@ -312,6 +330,9 @@ def _transcribe_with_timestamps(audio_path: Path) -> list[dict]:
                         "text":  full_text,
                     })
 
+        if on_progress:
+            on_progress(min(batch_start + BATCH_SIZE, len(chunks)), len(chunks))
+
     # Chunks don't overlap, so no deduplication: repeated phrases in the video are kept.
     return segments
 
@@ -323,6 +344,74 @@ def _get_duration(audio_path: Path) -> Optional[float]:
         return round(info.duration, 2)
     except Exception:
         return None
+
+
+# ── Background jobs ───────────────────────────────────────────────────────────
+# Cloudflare (the demo tunnel, RunPod's proxy) closes any request after 100 s, so a long video
+# can't be processed inside one request. POST /jobs returns a job ID at once and the web app polls
+# GET /jobs/{id}. A single worker thread runs jobs in order: there is one GPU, and running two
+# videos at once would only make both slower.
+JOB_KEEP_SECONDS = 3600  # finished jobs are forgotten after an hour
+
+_jobs: dict[str, dict] = {}
+_jobs_lock = threading.Lock()
+_job_runner = ThreadPoolExecutor(max_workers=1, thread_name_prefix="transcribe")
+
+
+def _update_job(job_id: str, **fields) -> None:
+    with _jobs_lock:
+        _jobs[job_id].update(fields, updated=time.time())
+
+
+def _run_job(job_id: str, url: str) -> None:
+    tmp_dir = Path(tempfile.mkdtemp(prefix="khmer_subtitle_"))
+    try:
+        _update_job(job_id, status="downloading")
+        audio_path = _download_audio(url, tmp_dir)
+        _update_job(job_id, status="transcribing", duration_seconds=_get_duration(audio_path))
+        segments = _transcribe_with_timestamps(
+            audio_path,
+            on_progress=lambda done, total: _update_job(job_id, chunks_done=done, chunks_total=total),
+        )
+        _update_job(job_id, status="done", segments=segments)
+    except HTTPException as error:
+        _update_job(job_id, status="error", error=str(error.detail), error_status=error.status_code)
+    except Exception as error:  # report it to the user instead of leaving the job "running" forever
+        _update_job(job_id, status="error", error=f"{type(error).__name__}: {error}", error_status=500)
+    finally:
+        shutil.rmtree(tmp_dir, ignore_errors=True)
+
+
+def _start_job(url: str):
+    """Queue a job; returns (job_id, future)."""
+    now = time.time()
+    with _jobs_lock:
+        for old_id in [j for j, job in _jobs.items()
+                       if job["status"] in ("done", "error") and job["updated"] < now - JOB_KEEP_SECONDS]:
+            del _jobs[old_id]
+        job_id = uuid.uuid4().hex
+        _jobs[job_id] = {"status": "queued", "created": now, "updated": now, "chunks_done": 0,
+                         "chunks_total": 0, "duration_seconds": None, "segments": [], "error": None}
+    return job_id, _job_runner.submit(_run_job, job_id, url)
+
+
+def _job_view(job_id: str) -> JobResponse:
+    with _jobs_lock:
+        job = _jobs.get(job_id)
+        if job is None:
+            raise HTTPException(status_code=404, detail="Job not found (it may have expired).")
+        ahead = sum(1 for other in _jobs.values()
+                    if other["status"] == "queued" and other["created"] < job["created"])
+        return JobResponse(
+            job_id=job_id,
+            status=job["status"],
+            queue_position=ahead if job["status"] == "queued" else 0,
+            chunks_done=job["chunks_done"],
+            chunks_total=job["chunks_total"],
+            duration_seconds=job["duration_seconds"],
+            segments=[Segment(**s) for s in job["segments"]] if job["status"] == "done" else [],
+            error=job["error"],
+        )
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
@@ -337,26 +426,39 @@ async def health():
     }
 
 
-@app.post("/process", response_model=ProcessResponse)
-async def process_youtube(request: ProcessRequest) -> ProcessResponse:
+@app.post("/jobs", response_model=JobResponse, status_code=202)
+def create_job(request: ProcessRequest) -> JobResponse:
     """
-    Main endpoint:
-    1. Download audio from YouTube URL via yt-dlp (16kHz mono WAV).
-    2. Split at pauses into chunks of at most 10 s.
-    3. Transcribe each chunk with return_timestamps=True.
-    4. Assemble timestamped Khmer segments.
+    Queue a YouTube URL for subtitling and return at once; poll GET /jobs/{job_id}.
+    The job: download audio via yt-dlp (16 kHz mono WAV) → split at pauses into chunks of at
+    most 10 s → transcribe with timestamps → timestamped Khmer segments.
     """
-    tmp_dir = Path(tempfile.mkdtemp(prefix="khmer_subtitle_"))
-    try:
-        audio_path = _download_audio(request.url, tmp_dir)
-        duration   = _get_duration(audio_path)
-        segments   = _transcribe_with_timestamps(audio_path)
+    job_id, _ = _start_job(request.url)
+    return _job_view(job_id)
 
-        return ProcessResponse(
-            success=True,
-            segments=[Segment(**s) for s in segments],
-            total_segments=len(segments),
-            duration_seconds=duration,
-        )
-    finally:
-        shutil.rmtree(tmp_dir, ignore_errors=True)
+
+@app.get("/jobs/{job_id}", response_model=JobResponse)
+def get_job(job_id: str) -> JobResponse:
+    """Job status, progress in chunks, and the segments once status is "done"."""
+    return _job_view(job_id)
+
+
+@app.post("/process", response_model=ProcessResponse)
+def process_youtube(request: ProcessRequest) -> ProcessResponse:
+    """
+    Same work as /jobs, answered in one request (for scripts and short videos). Behind a
+    Cloudflare proxy, videos longer than ~4 minutes exceed its 100 s limit; use /jobs there.
+    Runs in the same one-at-a-time queue as /jobs.
+    """
+    job_id, future = _start_job(request.url)
+    future.result()
+    with _jobs_lock:
+        job = dict(_jobs[job_id])
+    if job["status"] == "error":
+        raise HTTPException(status_code=job.get("error_status", 500), detail=job["error"])
+    return ProcessResponse(
+        success=True,
+        segments=[Segment(**s) for s in job["segments"]],
+        total_segments=len(job["segments"]),
+        duration_seconds=job["duration_seconds"],
+    )
