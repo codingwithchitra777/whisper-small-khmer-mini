@@ -71,10 +71,31 @@ spacing is inconsistent, so CER without spaces is the fairest measure).
 3. Commit with `MODE` = `smoke`, then `train`, then `ablation`, then `evaluate` (details in the notebook).
 4. Download `models/whisper-small-khmer-mini/` from the `train` version's output into `models/`.
 
-**Demo locally:**
-```powershell
-python -m venv py-venv; .\py-venv\Scripts\Activate.ps1; pip install -r requirements.txt
-.\start-api.ps1      # FastAPI on http://localhost:8000 (loads models/whisper-small-khmer-mini)
-.\start-webapp.ps1   # Next.js on http://localhost:3000
-```
-Set `KHMER_MODEL_DIR` to demo a different model folder.
+**Run the demo on your own machine** (Windows, PowerShell). Needs Python 3.12, Node.js 18+, and
+`ffmpeg` on your PATH.
+
+1. **Get the model.** It is not in git (967 MB, over GitHub's 100 MB file limit, and trained partly on
+   research-use-only data). Get `whisper-small-khmer-mini.zip` (973 MB) from the team chat, check it with
+   `Get-FileHash .\whisper-small-khmer-mini.zip -Algorithm MD5` (expected
+   `E29484FF884A21CA5FE285C3E3797AD1`), and extract it so this file exists:
+   `models\whisper-small-khmer-mini\model.safetensors` (not one folder deeper).
+2. **Create the Python environment** in the repo root. The start script always uses `py-venv`:
+   ```powershell
+   python -m venv py-venv
+   # NVIDIA GPU only (much faster); skip on a CPU-only machine:
+   .\py-venv\Scripts\pip install torch --index-url https://download.pytorch.org/whl/cu128
+   .\py-venv\Scripts\pip install -r requirements.txt
+   ```
+3. **Start the API and the web app** in two PowerShell windows:
+   ```powershell
+   .\start-api.ps1      # FastAPI on http://localhost:8000; wait for "Model loaded successfully"
+   .\start-webapp.ps1   # Next.js on http://localhost:3000; open it and paste a YouTube link
+   ```
+   The API log says `on GPU` or `on CPU`. CPU works but is several times slower.
+   If PowerShell refuses to run scripts: `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` (once).
+4. **Optional public link** for a demo: download `cloudflared-windows-amd64.exe` from
+   github.com/cloudflare/cloudflared/releases into `tools\cloudflared.exe`, then run
+   `.\tools\cloudflared.exe tunnel --url http://localhost:3000` and share the `trycloudflare.com` link it
+   prints (it changes every run; anyone with it can use your machine's GPU while it runs).
+
+Set `KHMER_MODEL_DIR` to demo a different model folder (for example the ablation model).
