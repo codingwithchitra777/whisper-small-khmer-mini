@@ -34,9 +34,12 @@ from transformers import WhisperForConditionalGeneration, WhisperProcessor
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-# The fine-tuned model downloaded from Kaggle goes here; KHMER_MODEL_DIR overrides it
-# (e.g. point it at another checkpoint to compare models in the demo).
+# The model loads from this local folder when it exists (KHMER_MODEL_DIR overrides it, e.g. to
+# compare checkpoints). Otherwise it is downloaded once from the Hugging Face Hub (cached in
+# ~/.cache/huggingface), so a fresh clone works without copying the 967 MB model by hand.
 MODEL_DIR = Path(os.environ.get("KHMER_MODEL_DIR", PROJECT_ROOT / "models" / "whisper-small-khmer-mini"))
+MODEL_REPO = os.environ.get("KHMER_MODEL_REPO", "chitra168/whisper-small-khmer-mini")
+MODEL_SOURCE = str(MODEL_DIR) if MODEL_DIR.exists() else MODEL_REPO
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 SAMPLING_RATE = 16_000
@@ -69,17 +72,17 @@ device: Optional[torch.device] = None
 async def lifespan(app: FastAPI):
     """Load model on startup, release on shutdown."""
     global processor, model, device
-    if not MODEL_DIR.exists():
-        raise RuntimeError(f"Model directory not found: {MODEL_DIR}")
-
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     device_label = "GPU" if torch.cuda.is_available() else "CPU"
-    print(f"[INFO] Loading Khmer Whisper model from {MODEL_DIR} on {device_label}...")
+    if MODEL_SOURCE == MODEL_REPO:
+        print(f"[INFO] {MODEL_DIR} not found; using {MODEL_REPO} from the Hugging Face Hub "
+              "(first start downloads ~1 GB).")
+    print(f"[INFO] Loading Khmer Whisper model from {MODEL_SOURCE} on {device_label}...")
 
-    processor = WhisperProcessor.from_pretrained(str(MODEL_DIR))
+    processor = WhisperProcessor.from_pretrained(MODEL_SOURCE)
     # fp16 on the GPU roughly halves transcription time; CPU stays fp32 (fp16 is slow there).
     dtype = torch.float16 if torch.cuda.is_available() else torch.float32
-    model = WhisperForConditionalGeneration.from_pretrained(str(MODEL_DIR), dtype=dtype).to(device)
+    model = WhisperForConditionalGeneration.from_pretrained(MODEL_SOURCE, dtype=dtype).to(device)
     model.eval()
 
     # ── Patch generation_config for newer transformers compatibility ──────────
@@ -422,7 +425,7 @@ async def health():
         "status": "ok",
         "model_loaded": model is not None,
         "device": "cuda" if torch.cuda.is_available() else "cpu",
-        "model_dir": str(MODEL_DIR),
+        "model_dir": MODEL_SOURCE,
     }
 
 

@@ -74,11 +74,11 @@ spacing is inconsistent, so CER without spaces is the fairest measure).
 **Run the demo on your own machine** (Windows, PowerShell). Needs Python 3.12, Node.js 18+, and
 `ffmpeg` on your PATH.
 
-1. **Get the model.** It is not in git (967 MB, over GitHub's 100 MB file limit, and trained partly on
-   research-use-only data). Get `whisper-small-khmer-mini.zip` (973 MB) from the team chat, check it with
-   `Get-FileHash .\whisper-small-khmer-mini.zip -Algorithm MD5` (expected
-   `E29484FF884A21CA5FE285C3E3797AD1`), and extract it so this file exists:
-   `models\whisper-small-khmer-mini\model.safetensors` (not one folder deeper).
+1. **The model downloads itself.** It is not in git (967 MB, over GitHub's 100 MB file limit). It is
+   published at [huggingface.co/chitra168/whisper-small-khmer-mini](https://huggingface.co/chitra168/whisper-small-khmer-mini)
+   (research and education use only), and the API downloads it automatically on its first start (~1 GB,
+   cached afterwards) when `models\whisper-small-khmer-mini\` does not exist. To use a local copy instead,
+   put the files in that folder.
 2. **Create the Python environment** in the repo root. The start script always uses `py-venv`:
    ```powershell
    python -m venv py-venv
