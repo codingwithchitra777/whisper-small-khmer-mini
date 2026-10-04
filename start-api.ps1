@@ -1,20 +1,21 @@
-# Start the Khmer Subtitle API (FastAPI + Uvicorn)
-# Run from the workspace root: .\start-api.ps1
+# Start the Khmer Subtitle API (FastAPI + Uvicorn) on http://localhost:8000
+# Run from anywhere: .\start-api.ps1
+# ASCII only: Windows PowerShell 5.1 misreads emoji in scripts saved without a BOM.
 
-Write-Host "🚀 Starting Khmer Subtitle API on http://localhost:8000" -ForegroundColor Cyan
+Set-Location $PSScriptRoot
+Write-Host "Starting Khmer Subtitle API on http://localhost:8000" -ForegroundColor Cyan
 
-# Activate the existing Python venv
-$venv = Join-Path $PSScriptRoot "py-venv\Scripts\Activate.ps1"
-if (Test-Path $venv) {
-    . $venv
-    Write-Host "✅ Virtual environment activated." -ForegroundColor Green
+# Always use the project's py-venv (GPU PyTorch), even if another environment is active.
+$python = Join-Path $PSScriptRoot "py-venv\Scripts\python.exe"
+if (Test-Path $python) {
+    Write-Host "Using $python" -ForegroundColor Green
 } else {
-    Write-Host "⚠️  No venv found at py-venv\. Using system Python." -ForegroundColor Yellow
+    Write-Host "No py-venv found; using the Python on PATH (create it: see README)." -ForegroundColor Yellow
+    $python = "python"
 }
 
-# Install all dependencies from main requirements.txt
-Write-Host "📦 Installing dependencies from requirements.txt…" -ForegroundColor Cyan
-pip install -r requirements.txt -q
+Write-Host "Checking dependencies from requirements.txt..." -ForegroundColor Cyan
+& $python -m pip install -r requirements.txt -q
 
-# Start uvicorn
-uvicorn api.main:app --reload --host 0.0.0.0 --port 8000
+# No --reload: a reload would restart the server and drop running transcription jobs.
+& $python -m uvicorn api.main:app --host 0.0.0.0 --port 8000
