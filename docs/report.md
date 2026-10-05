@@ -276,6 +276,9 @@ model that rambles.*
 
 **Test results.** All three models transcribed both test sets with the same decoding settings (greedy,
 Khmer, up to 444 new tokens). Table 8 gives the results; the main model is best on every metric and both sets.
+In plain terms, the main model gets roughly four characters in five right: a CER without spaces of 18.9% on
+speakers it has never heard corresponds to about 81% character accuracy (approximate, because CER also counts
+inserted characters), and 24.9% on held-out sentences to about 75%.
 
 | Model | Test set | Clips | WER | CER | CER no space |
 | --- | --- | --- | --- | --- | --- |
@@ -354,7 +357,22 @@ The complete system runs locally: `start-api.ps1` starts the FastAPI back end wi
 YouTube video link, show the progress steps, play the video next to the generated subtitles, and export the SRT
 file.
 
-[Name the video(s) used in the demo and note how long processing took on your machine, CPU or GPU.]
+For the demo, the web app is shared with a public link through a Cloudflare quick tunnel, while the model runs on
+a laptop with an NVIDIA RTX 4060 Laptop GPU (8 GB). Table 11 shows the end-to-end time for two real Khmer news
+videos, from submitting the link to receiving all subtitles, including the YouTube download.
+
+| Video | Length | Processing time | Subtitle lines | Speed |
+| --- | --- | --- | --- | --- |
+| *The One News*: Korean DMZ incident report (`g5w3-ViyvPI`) | 2 min 44 s | 65 s | 23 | about 2.5× faster than real time |
+| News commentary on the Thai–Cambodian border (`AzJBYI82L6Q`) | 8 min 34 s | 146 s | 62 | about 3.5× faster than real time |
+
+*Table 11. End-to-end processing time on an RTX 4060 Laptop GPU (batched fp16 transcription, 10-second chunks).
+The second video was run through the public link, which is only possible with the background job system,
+because Cloudflare closes any single request after 100 seconds.*
+
+Longer videos are relatively faster because the one-off costs (the YouTube download and GPU warm-up) are spread
+over more audio. On the first video, the subtitles were readable and followed the story, with errors concentrated in
+foreign names (for example, the South Korean president's name) and fast speech, consistent with Section 6.
 
 ## 8. Limitations and Future Work
 
