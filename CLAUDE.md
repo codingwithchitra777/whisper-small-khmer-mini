@@ -19,13 +19,11 @@ data parquet, `models/` and `outputs/` are gitignored.
     sentence also in `ddd_test`. Preserve both properties if you change it.
   - `train.py` (`--sources` = ablation, `--time-limit-hours` + `--resume` for Kaggle's 12 h
     sessions; resume needs torch >= 2.6), `evaluate.py` (`--split test|ddd_test|validation`).
-- `kaggle/package.py` builds the data and code zips; `kaggle/train_khmer_whisper.ipynb` runs
-  smoke / train / ablation / evaluate on Kaggle T4 ×2. If you add a module under `src/`, it is
-  packaged automatically (all `src/*.py`).
-- `runpod/` is the RunPod alternative, independent of `kaggle/`: `runpod/package.py` builds the
+- `runpod/` trains on a rented GPU: `runpod/package.py` builds the
   zips into `outputs/runpod/` (code zip includes `runpod/run.sh`); `runpod/run.sh` runs
   setup / smoke / train / ablation / evaluate / pack on one GPU under `/workspace`, with long
-  runs in the background (logs in `/workspace/logs`).
+  runs in the background (logs in `/workspace/logs`). If you add a module under `src/`, it is
+  packaged automatically (all `src/*.py`).
 - `api/main.py` (FastAPI) loads `models/whisper-small-khmer-mini` or `KHMER_MODEL_DIR`; it cuts
   audio at pauses into ≤10 s chunks because Khmer uses ~400 Whisper tokens per 15 s of read speech
   (more for fast news) against the 448-token decoder limit; 15 s chunks garbled sentence endings.

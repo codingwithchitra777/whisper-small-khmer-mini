@@ -14,7 +14,7 @@ Group2-*/
 Gropu2-*/
 *.zip
 
-# Large artifacts: rebuilt with src/build_dataset.py or downloaded from Kaggle
+# Large artifacts: rebuilt with src/build_dataset.py or downloaded from RunPod
 data/khmer-asr-mini/*.parquet
 models/
 outputs/*

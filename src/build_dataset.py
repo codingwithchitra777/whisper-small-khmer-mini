@@ -1,4 +1,4 @@
-"""Pack the collected Khmer speech datasets into Kaggle-ready parquet files.
+"""Pack the collected Khmer speech datasets into parquet files for GPU training.
 
     python -m src.build_dataset
 
@@ -8,7 +8,7 @@ writes `data/khmer-asr-mini/`:
 
 - train-0000N.parquet, validation.parquet, test.parquet  (columns: id, source, text, duration, audio)
 - ddd_test.parquet  (out-of-domain test: speakers and sentences none of the sources contain)
-- summary.json, README.md  (dataset card for Kaggle)
+- summary.json, README.md  (dataset card)
 
 Audio is re-encoded to 16 kHz mono FLAC. A sentence always lands in exactly one split (assigned
 by hashing its text without spaces), and training drops any sentence that is also in ddd_test.
@@ -150,7 +150,7 @@ def hours(frame: pd.DataFrame) -> float:
 
 
 def write_card(summary: Dict) -> None:
-    """Write `README.md` (the dataset card shown on Kaggle) next to the parquet files.
+    """Write `README.md` (the dataset card) next to the parquet files.
 
     Args:
         summary: the dict `main` saves as summary.json (clips and hours per split and per

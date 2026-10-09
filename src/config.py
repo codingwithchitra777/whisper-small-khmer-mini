@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
-DATA_DIR = ROOT_DIR / "data" / "khmer-asr-mini"  # built by src/build_dataset.py, uploaded to Kaggle
+DATA_DIR = ROOT_DIR / "data" / "khmer-asr-mini"  # built by src/build_dataset.py, uploaded to the training GPU
 MODELS_DIR = ROOT_DIR / "models"
 FINE_TUNED_MODEL_DIR = MODELS_DIR / "whisper-small-khmer-mini"
 OUTPUTS_DIR = ROOT_DIR / "outputs"
