@@ -1,0 +1,77 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 40 1040 560" width="1040" height="560" role="img" aria-labelledby="whisper-architecture-title whisper-architecture-desc">
+  <title id="whisper-architecture-title">Whisper-small encoder–decoder architecture</title>
+  <desc id="whisper-architecture-desc">The encoder turns up to 30 seconds of audio, as an 80-channel log-Mel spectrogram, into hidden states through 12 Transformer blocks; the decoder, prompted with Khmer transcription tokens, attends to those states through cross-attention in its 12 blocks and writes Khmer text with timestamp tokens one token at a time, up to 448 tokens.</desc>
+  <defs>
+    <style>@import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;600&amp;family=Geist+Mono:wght@400;500&amp;display=swap');</style>
+    <marker id="w-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#4f5d75"/></marker>
+    <marker id="w-arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#eb6c36"/></marker>
+    <marker id="w-arrow-link" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#2e5aa8"/></marker>
+  </defs>
+  <rect x="0" y="40" width="1040" height="560" fill="#f5f5f5"/>
+
+  <rect x="56" y="64" width="328" height="352" rx="8" fill="rgba(45,49,66,0.03)" stroke="rgba(45,49,66,0.25)" stroke-width="1"/>
+  <text x="72" y="84" fill="#4f5d75" font-size="8" font-family="'Geist Mono', Consolas, monospace" letter-spacing="0.14em">ENCODER · reads the audio once</text>
+  <rect x="656" y="64" width="360" height="464" rx="8" fill="rgba(45,49,66,0.03)" stroke="rgba(45,49,66,0.25)" stroke-width="1"/>
+  <text x="672" y="84" fill="#4f5d75" font-size="8" font-family="'Geist Mono', Consolas, monospace" letter-spacing="0.14em">DECODER · writes one token at a time</text>
+  <line x1="220" y1="168" x2="220" y2="206" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#w-arrow)"/>
+  <line x1="220" y1="280" x2="220" y2="318" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#w-arrow)"/>
+  <line x1="820" y1="168" x2="820" y2="206" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#w-arrow)"/>
+  <line x1="820" y1="280" x2="820" y2="318" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#w-arrow)"/>
+  <line x1="820" y1="392" x2="820" y2="430" stroke="#eb6c36" stroke-width="1.2" marker-end="url(#w-arrow-accent)"/>
+  <line x1="360" y1="356" x2="678" y2="356" stroke="#2e5aa8" stroke-width="1.2" marker-end="url(#w-arrow-link)"/>
+  <path d="M960,468 H992 Q1000,468 1000,460 V252 Q1000,244 992,244 H962" fill="none" stroke="#4f5d75" stroke-width="1.2" stroke-dasharray="5,4" marker-end="url(#w-arrow)"/>
+
+  <rect x="464.0" y="336" width="112" height="12" rx="2" fill="#f5f5f5"/>
+  <text x="520" y="345" fill="#7a8399" font-size="8" font-family="'Geist Mono', Consolas, monospace" text-anchor="middle" letter-spacing="0.06em">ENCODER STATES</text>
+  <rect x="464.0" y="364" width="112" height="12" rx="2" fill="#f5f5f5"/>
+  <text x="520" y="373" fill="#7a8399" font-size="8" font-family="'Geist Mono', Consolas, monospace" text-anchor="middle" letter-spacing="0.06em">CROSS-ATTENTION</text>
+  <rect x="928.0" y="406" width="68" height="12" rx="2" fill="#f5f5f5"/>
+  <text x="962" y="415" fill="#7a8399" font-size="8" font-family="'Geist Mono', Consolas, monospace" text-anchor="middle" letter-spacing="0.06em">NEXT TOKEN</text>
+
+  <rect x="80" y="96" width="280" height="72" rx="6" fill="#f5f5f5"/>
+  <rect x="80" y="96" width="280" height="72" rx="6" fill="rgba(79,93,117,0.10)" stroke="#7a8399" stroke-width="1"/>
+  <rect x="88" y="104" width="20" height="12" rx="2" fill="none" stroke="#7a8399" stroke-opacity="0.4" stroke-width="0.8"/>
+  <text x="98.0" y="113" fill="#7a8399" fill-opacity="0.8" font-size="7" font-family="'Geist Mono', Consolas, monospace" text-anchor="middle" letter-spacing="0.08em">IN</text>
+  <text x="220" y="140" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', 'Segoe UI', sans-serif" text-anchor="middle">Audio chunk</text>
+  <text x="220" y="156" fill="#4f5d75" font-size="9" font-family="'Geist Mono', Consolas, monospace" text-anchor="middle">16 kHz mono · ≤ 30 s (we use ≤ 10 s)</text>
+  <rect x="80" y="208" width="280" height="72" rx="6" fill="#f5f5f5"/>
+  <rect x="80" y="208" width="280" height="72" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+  <rect x="88" y="216" width="32" height="12" rx="2" fill="none" stroke="#2d3142" stroke-opacity="0.4" stroke-width="0.8"/>
+  <text x="104.0" y="225" fill="#2d3142" fill-opacity="0.8" font-size="7" font-family="'Geist Mono', Consolas, monospace" text-anchor="middle" letter-spacing="0.08em">STEP</text>
+  <text x="220" y="252" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', 'Segoe UI', sans-serif" text-anchor="middle">Log-Mel spectrogram</text>
+  <text x="220" y="268" fill="#4f5d75" font-size="9" font-family="'Geist Mono', Consolas, monospace" text-anchor="middle">80 channels × 3,000 frames</text>
+  <rect x="80" y="320" width="280" height="72" rx="6" fill="#f5f5f5"/>
+  <rect x="80" y="320" width="280" height="72" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+  <rect x="88" y="328" width="26" height="12" rx="2" fill="none" stroke="#2d3142" stroke-opacity="0.4" stroke-width="0.8"/>
+  <text x="101.0" y="337" fill="#2d3142" fill-opacity="0.8" font-size="7" font-family="'Geist Mono', Consolas, monospace" text-anchor="middle" letter-spacing="0.08em">ENC</text>
+  <text x="220" y="364" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', 'Segoe UI', sans-serif" text-anchor="middle">Encoder × 12 blocks</text>
+  <text x="220" y="380" fill="#4f5d75" font-size="9" font-family="'Geist Mono', Consolas, monospace" text-anchor="middle">conv stem · self-attention + MLP · d=768</text>
+  <rect x="680" y="96" width="280" height="72" rx="6" fill="#f5f5f5"/>
+  <rect x="680" y="96" width="280" height="72" rx="6" fill="rgba(235,108,54,0.10)" stroke="#eb6c36" stroke-width="1"/>
+  <rect x="688" y="104" width="44" height="12" rx="2" fill="none" stroke="#eb6c36" stroke-opacity="0.4" stroke-width="0.8"/>
+  <text x="710.0" y="113" fill="#eb6c36" fill-opacity="0.8" font-size="7" font-family="'Geist Mono', Consolas, monospace" text-anchor="middle" letter-spacing="0.08em">PROMPT</text>
+  <text x="820" y="140" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', 'Segoe UI', sans-serif" text-anchor="middle">Khmer task tokens</text>
+  <text x="820" y="156" fill="#4f5d75" font-size="9" font-family="'Geist Mono', Consolas, monospace" text-anchor="middle">&lt;|sot|&gt; &lt;|km|&gt; &lt;|transcribe|&gt; &lt;|0.00|&gt;</text>
+  <rect x="680" y="208" width="280" height="72" rx="6" fill="#f5f5f5"/>
+  <rect x="680" y="208" width="280" height="72" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+  <rect x="688" y="216" width="26" height="12" rx="2" fill="none" stroke="#2d3142" stroke-opacity="0.4" stroke-width="0.8"/>
+  <text x="701.0" y="225" fill="#2d3142" fill-opacity="0.8" font-size="7" font-family="'Geist Mono', Consolas, monospace" text-anchor="middle" letter-spacing="0.08em">EMB</text>
+  <text x="820" y="252" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', 'Segoe UI', sans-serif" text-anchor="middle">Token + position embedding</text>
+  <text x="820" y="268" fill="#4f5d75" font-size="9" font-family="'Geist Mono', Consolas, monospace" text-anchor="middle">51,865-token vocabulary</text>
+  <rect x="680" y="320" width="280" height="72" rx="6" fill="#f5f5f5"/>
+  <rect x="680" y="320" width="280" height="72" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+  <rect x="688" y="328" width="26" height="12" rx="2" fill="none" stroke="#2d3142" stroke-opacity="0.4" stroke-width="0.8"/>
+  <text x="701.0" y="337" fill="#2d3142" fill-opacity="0.8" font-size="7" font-family="'Geist Mono', Consolas, monospace" text-anchor="middle" letter-spacing="0.08em">DEC</text>
+  <text x="820" y="364" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', 'Segoe UI', sans-serif" text-anchor="middle">Decoder × 12 blocks</text>
+  <text x="820" y="380" fill="#4f5d75" font-size="9" font-family="'Geist Mono', Consolas, monospace" text-anchor="middle">masked self-attn · cross-attn · MLP</text>
+  <rect x="680" y="432" width="280" height="72" rx="6" fill="#f5f5f5"/>
+  <rect x="680" y="432" width="280" height="72" rx="6" fill="rgba(235,108,54,0.10)" stroke="#eb6c36" stroke-width="1"/>
+  <rect x="688" y="440" width="26" height="12" rx="2" fill="none" stroke="#eb6c36" stroke-opacity="0.4" stroke-width="0.8"/>
+  <text x="701.0" y="449" fill="#eb6c36" fill-opacity="0.8" font-size="7" font-family="'Geist Mono', Consolas, monospace" text-anchor="middle" letter-spacing="0.08em">OUT</text>
+  <text x="820" y="476" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', 'Segoe UI', sans-serif" text-anchor="middle">Khmer text + timestamps</text>
+  <text x="820" y="492" fill="#4f5d75" font-size="9" font-family="'Geist Mono', Consolas, monospace" text-anchor="middle">ភាសាខ្មែរ… &lt;|8.68|&gt; · ≤ 448 tokens</text>
+
+  <line x1="24" y1="552" x2="1016" y2="552" stroke="rgba(45,49,66,0.10)" stroke-width="0.8"/>
+  <text x="24" y="579" fill="#4f5d75" font-size="8" font-family="'Geist Mono', Consolas, monospace" letter-spacing="0.14em">LEGEND</text>
+<rect x="96" y="568" width="20" height="16" rx="3" fill="rgba(235,108,54,0.10)" stroke="#eb6c36"/><text x="124" y="579" fill="#4f5d75" font-size="9" font-family="'Geist Mono', Consolas, monospace">set by our fine-tuning (Khmer + timestamps)</text><rect x="392" y="568" width="20" height="16" rx="3" fill="#ffffff" stroke="#2d3142"/><text x="420" y="579" fill="#4f5d75" font-size="9" font-family="'Geist Mono', Consolas, monospace">Whisper-small layer (all 241M weights fine-tuned)</text><line x1="720" y1="576" x2="740" y2="576" stroke="#4f5d75" stroke-width="1.2" stroke-dasharray="5,4"/><text x="748" y="579" fill="#4f5d75" font-size="9" font-family="'Geist Mono', Consolas, monospace">autoregressive loop</text>
+</svg>

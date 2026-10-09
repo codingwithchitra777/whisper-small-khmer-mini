@@ -1,4 +1,4 @@
-"""Build the system architecture figure (Figure 1 in docs/report.md): SVG, HTML page and PNG.
+"""Build the system architecture figure (Figure 2 in docs/report.md): SVG, HTML page and PNG.
 
     python docs/figures/build_system_architecture.py      # PNG needs Google Chrome installed
 """

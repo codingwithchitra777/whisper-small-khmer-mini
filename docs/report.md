@@ -2,11 +2,18 @@
 
 **Fine-tuning Whisper-small to generate timestamped Khmer subtitles for YouTube videos**
 
-Final Project Report · [Your name] · [Student ID] · [Course name] · Instructor: Chen Sovann · October 2026
-Code: github.com/codingwithchitra777/whisper-small-khmer-mini
+**Final Project Report**
 
-> Text in **[brackets]** is a placeholder to fill in before submission (mostly results from the RunPod
-> `evaluate` run).
+| | |
+| --- | --- |
+| University | Royal University of Phnom Penh |
+| Programme | Master of Science in Data Science and Engineering |
+| Subject | Introduction to Large Language Models |
+| Lecturer | Dr. Chen Sovann |
+| Students | Sem Chitra, Sar Sakal, Earn Pisey, Sam Reaksmey |
+| Class | MDSE Cohort 3, October 2026 |
+| Code | [github.com/codingwithchitra777/whisper-small-khmer-mini](https://github.com/codingwithchitra777/whisper-small-khmer-mini) |
+| Model | [huggingface.co/chitra168/whisper-small-khmer-mini](https://huggingface.co/chitra168/whisper-small-khmer-mini) |
 
 ## Abstract
 
@@ -54,18 +61,32 @@ a baseline and an ablation (Section 6).
 
 ## 2. Existing Solutions and What Is Missing
 
-> Check each claim in this section against the current state of the products before submitting, and add links
-> or screenshots as evidence.
-
 | Existing option | What it offers | What is missing for Khmer subtitles |
 | --- | --- | --- |
 | Manual transcription | High accuracy | Slow and expensive; hours of work per hour of video |
-| YouTube automatic captions | Free, built into the platform | [Check whether YouTube auto-captions currently support Khmer, and how good they are] |
-| Commercial speech APIs (e.g. Google Cloud Speech-to-Text) | Khmer is listed among supported languages | Paid per minute, generic model, no subtitle workflow; [add observed quality if you tested it] |
+| YouTube automatic captions | Free, built into the platform; "Central Khmer" is on YouTube's list of automatic-caption languages [8] | Only for videos on YouTube and only if captions are generated for the video; YouTube publishes no accuracy figures and itself warns that "the quality of the captions may vary" [8] |
+| Commercial speech APIs (Google Cloud Speech-to-Text) | Khmer (`km-KH`) is supported, including the Chirp 2 and Chirp 3 models with automatic punctuation [9] | Paid per minute of audio; a general-purpose model with no Khmer accuracy figures published; no subtitle workflow (the user must download audio, call the API and build subtitle files themselves) |
 | OpenAI Whisper, used as is (zero-shot) | Free, open-source, supports Khmer | Khmer was a tiny part of its training data, so accuracy is low (measured in Section 6 as our baseline) |
-| Community Khmer ASR models | Open models trained on public Khmer data | Usually released as models only, without an end-user subtitle tool; [name any you found] |
+| Community Khmer ASR models on Hugging Face (Table 1b) | Free, open models fine-tuned on public Khmer data | Released as models only: none provides an end-user tool from a video link to subtitle files |
 
 *Table 1. Existing options for getting Khmer subtitles.*
+
+Table 1b lists the most-downloaded Khmer speech recognition models on the Hugging Face Hub (October 2026) with
+the results their authors report. Each is measured on a different test set, so the numbers cannot be compared
+directly with each other or with ours.
+
+| Model | Base model | Training data | Reported result |
+| --- | --- | --- | --- |
+| [gagan3012/wav2vec2-xlsr-khmer](https://huggingface.co/gagan3012/wav2vec2-xlsr-khmer) | wav2vec2-large-XLSR-53 | Common Voice, OpenSLR 42 | WER 24.96% on an OpenSLR 42 split |
+| [seanghay/whisper-small-khmer-v2](https://huggingface.co/seanghay/whisper-small-khmer-v2) | Whisper-small (same as ours) | OpenSLR 42, Google FLEURS, km-speech-corpus | WER 61.65% on Google FLEURS |
+| [seanghay/Qwen3-ASR-0.6B-Khmer](https://huggingface.co/seanghay/Qwen3-ASR-0.6B-Khmer) | Qwen3-ASR-0.6B | ~700 h of the Digital Divide Data Khmer dataset | CER (space-insensitive) 1.96% in-domain, 7.91% out-of-domain |
+
+*Table 1b. Community Khmer speech recognition models (reported by their authors, not re-measured by us).*
+
+The strongest of these, Qwen3-ASR-0.6B-Khmer, was trained on roughly 40 times more audio than our model (about
+700 hours against our 16), and on the same Digital Divide Data dataset our out-of-domain test set comes from, so
+its scores show what more data can achieve rather than a like-for-like comparison. None of these models comes
+with a way for a non-programmer to subtitle a video.
 
 The gap is a free tool that goes all the way from a video link to subtitle timings, backed by a model trained
 specifically for Khmer. Our project addresses both parts: a Khmer-tuned model and a complete subtitle workflow
@@ -132,8 +153,14 @@ to them. Whisper was pre-trained on 680,000 hours of multilingual speech, but on
 was Khmer, which is why its zero-shot Khmer output is poor. We chose the small size because it can be fully
 fine-tuned on a single consumer GPU in under an hour and runs acceptably fast for a demo.
 
-> [Add a figure of the Whisper architecture here (encoder–decoder diagram), with a citation to Radford et al.
-> (2023).]
+![Whisper-small encoder–decoder architecture: the encoder turns an audio chunk, as an 80-channel log-Mel
+spectrogram, into hidden states through 12 Transformer blocks; the decoder, prompted with Khmer transcription
+tokens, attends to them through cross-attention and writes Khmer text with timestamp tokens one token at a
+time.](figures/whisper-architecture.png)
+
+*Figure 1. Whisper-small as used in this project, after Radford et al. (2023) [1]. All 241 million weights are
+fine-tuned; the highlighted parts are what our fine-tuning sets for Khmer: the task prompt (language `km`,
+task `transcribe`, timestamps on) and timestamped Khmer output, capped at 448 tokens.*
 
 ### 4.2 How we customised the fine-tuning
 
@@ -184,7 +211,7 @@ The front end forwards requests to the API, which runs on the same machine.
 FastAPI back end; the back end downloads the audio, splits it at pauses, transcribes it with the fine-tuned
 Whisper-small model and returns timestamped segments.](figures/system-architecture.png)
 
-*Figure 1. System architecture. The fine-tuned model (highlighted) is trained offline on RunPod and loaded by
+*Figure 2. System architecture. The fine-tuned model (highlighted) is trained offline on RunPod and loaded by
 the back end at start-up.*
 
 When a user submits a YouTube link, the back end (`api/main.py`) runs these steps:
@@ -305,8 +332,6 @@ because inserted words or characters count as errors on top of the reference len
 *Table 9. CER without spaces on `test`, per source. `rfi_manual` has only 4 test clips, so its score is not
 reliable on its own.*
 
-> Optional: plot the validation curves (Tables 6 and 7) as a figure.
-
 ### 6.4 Discussion
 
 - **Fine-tuning turns an unusable model into a usable one.** Zero-shot Whisper-small does not produce Khmer
@@ -414,3 +439,9 @@ github.com/codingwithchitra777/whisper-small-khmer-mini.
    https://huggingface.co/datasets/Digital-Divide-Data/khmer-speech-dataset
 7. Wolf, T., et al. (2020). Transformers: State-of-the-art natural language processing. *Proceedings of EMNLP
    2020: System Demonstrations.*
+8. YouTube Help. Use automatic captioning (list of automatic-caption languages). Accessed October 2026.
+   https://support.google.com/youtube/answer/6373554
+9. Google Cloud. Speech-to-Text supported languages (Khmer, km-KH). Accessed October 2026.
+   https://docs.cloud.google.com/speech-to-text/docs/speech-to-text-supported-languages
+10. Hugging Face Hub. Khmer automatic-speech-recognition models (search "khmer", sorted by downloads).
+    Accessed October 2026. https://huggingface.co/models?pipeline_tag=automatic-speech-recognition&search=khmer
