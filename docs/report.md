@@ -198,7 +198,7 @@ We fine-tune all 241 million parameters (no frozen layers or adapters), using th
 | Hardware | RunPod, 1 × NVIDIA RTX 4090 (24 GB), $0.74/hour |
 | Measured training speed | ~1.45 optimiser steps/s (smoke test) |
 | Training time | 44 min 24 s for the main model (2,664 s, 3,245 steps); 7 min 35 s for the ablation (455 s, 410 steps); evaluations included |
-| Total GPU cost | [about $X, from the RunPod billing page] |
+| Total cloud cost | US$3.72 for the whole project on RunPod ($3.66 GPU time + $0.06 storage, 3 October 2026, from the RunPod billing page) |
 
 *Table 4. Fine-tuning hyperparameters.*
 
