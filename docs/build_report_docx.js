@@ -74,7 +74,8 @@ function image(file, alt) {
   const data = fs.readFileSync(file);
   const w = data.readUInt32BE(16), h = data.readUInt32BE(20);
   const widthPx = 600; // ~6.25 in at 96 dpi, the text column
-  return new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 120, after: 60 },
+  // keepNext: Word keeps the figure on the same page as its caption
+  return new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 120, after: 60 }, keepNext: true,
     children: [new ImageRun({ type: "png", data, transformation: { width: widthPx, height: Math.round(widthPx * h / w) },
       altText: { title: alt.split(":")[0], description: alt, name: path.basename(file) } })] });
 }

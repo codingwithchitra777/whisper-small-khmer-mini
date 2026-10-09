@@ -13,14 +13,15 @@ src/
   build_dataset.py   packs the collected datasets into data/khmer-asr-mini/ (parquet, FLAC audio)
   train.py           fine-tuning (Seq2SeqTrainer); --sources for the ablation
   evaluate.py        WER / CER / CER-without-spaces on the test sets, overall and per source
-kaggle/
-  package.py                 builds the two Kaggle upload zips (data, code)
-  train_khmer_whisper.ipynb  Kaggle notebook: smoke / train / ablation / evaluate
+runpod/
+  package.py         builds the code and data zips to upload to a RunPod GPU pod
+  run.sh             on the pod: setup / smoke / train / ablation / evaluate / pack
 api/main.py          FastAPI backend: YouTube URL -> audio -> pause-based chunks -> subtitles
 webapp/              Next.js front end: URL input, video, subtitle timeline, SRT/TXT export
-data/khmer-asr-mini/ the packed dataset (built locally, uploaded to Kaggle)
-models/              fine-tuned models downloaded from Kaggle
-outputs/             evaluation reports, Kaggle zips
+data/khmer-asr-mini/ the packed dataset (built locally, uploaded to the training GPU)
+models/              the fine-tuned model (downloaded from RunPod; also on Hugging Face)
+outputs/             evaluation reports and training logs
+docs/                final report (.docx/.md), presentation, figures
 ```
 
 ## Dataset
@@ -49,7 +50,8 @@ whitespace collapsed; OpenSLR's word-segmentation spaces removed so every source
 spacing style; each sentence is assigned to exactly one split by hashing its text (no sentence
 leaks between train and test); any training sentence that also appears in `ddd_test` is removed.
 
-Two sources are research-use-only, so the Kaggle dataset must stay **private**.
+Two sources are research-use-only, so the packed dataset is kept **private** and is not in this
+repository (only its description, `data/khmer-asr-mini/README.md` and `summary.json`).
 
 ## Experiments
 
@@ -64,12 +66,14 @@ spacing is inconsistent, so CER without spaces is the fairest measure).
 
 ## Run it
 
-**Train on Kaggle** (free T4 ×2):
-1. `python kaggle/package.py` → upload `outputs/kaggle/khmer-asr-mini-data.zip` and
-   `outputs/kaggle/khmer-asr-mini-code.zip` as two private Kaggle datasets.
-2. Import `kaggle/train_khmer_whisper.ipynb` into Kaggle, attach both datasets, GPU T4 ×2, Internet on.
-3. Commit with `MODE` = `smoke`, then `train`, then `ablation`, then `evaluate` (details in the notebook).
-4. Download `models/whisper-small-khmer-mini/` from the `train` version's output into `models/`.
+**Train on a RunPod GPU** (how the published model was trained: one RTX 4090, 44 minutes):
+1. `python runpod/package.py --data` → `outputs/runpod/khmer-asr-mini-code.zip` and `khmer-asr-mini-data.zip`.
+2. Start a pod from the **Runpod Pytorch 2.8.0** template with a 50 GB volume at `/workspace`, and upload
+   both zips to `/workspace` (JupyterLab file browser).
+3. In the pod terminal: `cd /workspace && python -m zipfile -e khmer-asr-mini-code.zip project`, then
+   `bash project/runpod/run.sh setup`, `smoke`, `train`, `ablation`, `evaluate`, `pack` (in that order;
+   long steps run in the background, logs in `/workspace/logs`).
+4. Download `/workspace/results.zip` and unzip `models/` into this project.
 
 **Run the demo on your own machine** (Windows, PowerShell). Needs Python 3.12, Node.js 18+, and
 `ffmpeg` on your PATH.

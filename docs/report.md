@@ -233,8 +233,27 @@ When a user submits a YouTube link, the back end (`api/main.py`) runs these step
 The front end (`webapp/`) shows the embedded YouTube video next to a scrollable subtitle timeline and lets the
 user export the subtitles as an SRT file (usable in YouTube Studio and video editors) or as plain text.
 
-> [Add 2–3 screenshots of the web app here: the input page, the results with the video and subtitle timeline,
-> and an exported SRT file.]
+Figures 3–5 show the web application during the recorded demo, transcribing a 2 min 25 s RFI Khmer news
+video.
+
+![The web application's start page: the title "Extract Khmer Subtitles from YouTube", a short
+explanation in English and Khmer, and the YouTube URL input with the Extract button.](figures/demo-1-input.png)
+
+*Figure 3. Start page: the user pastes a YouTube link and clicks Extract.*
+
+![The web application while processing: the Download and Extract Audio steps are complete, the Transcribe
+step is active with a progress bar reading "Transcribing 16 / 18 chunks", and the YouTube video is shown on
+the right.](figures/demo-2-progress.png)
+
+*Figure 4. Processing: the page polls the back end's background job and shows real progress, here 16 of the
+video's 18 audio chunks transcribed.*
+
+![The finished result: all four steps complete, a summary of 18 segments, 2 min 25 s duration and Khmer
+language, Export SRT, Export TXT and Copy Text buttons, and the Khmer subtitle list with start and end
+times next to the video.](figures/demo-3-results.png)
+
+*Figure 5. Result: 18 timestamped Khmer subtitle lines next to the video, ready to export as an SRT file (for
+YouTube Studio and video editors) or as plain text.*
 
 ## 6. Experiments and Results
 
@@ -380,7 +399,8 @@ reliable on its own.*
 The complete system runs locally: `start-api.ps1` starts the FastAPI back end with the fine-tuned model on port
 8000, and `start-webapp.ps1` starts the Next.js front end on port 3000. In the live demo we paste a Khmer
 YouTube video link, show the progress steps, play the video next to the generated subtitles, and export the SRT
-file.
+file. A two-minute screen recording of this demo (`docs/Group2-Demo.mp4` in the submission package) shows the
+full run on a 2 min 25 s RFI Khmer news video; Figures 3–5 are taken from it.
 
 For the demo, the web app is shared with a public link through a Cloudflare quick tunnel, while the model runs on
 a laptop with an NVIDIA RTX 4060 Laptop GPU (8 GB). Table 11 shows the end-to-end time for two real Khmer news
