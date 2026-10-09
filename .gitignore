@@ -7,6 +7,12 @@ webapp/.next/
 webapp/next-env.d.ts
 .idea/
 tools/
+# Office lock files created while a document is open
+~$*
+# Offline submission package (a copy of the repo plus the model)
+Group2-*/
+Gropu2-*/
+*.zip
 
 # Large artifacts: rebuilt with src/build_dataset.py or downloaded from Kaggle
 data/khmer-asr-mini/*.parquet

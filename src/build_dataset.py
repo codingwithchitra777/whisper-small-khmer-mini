@@ -37,21 +37,36 @@ from src.speech import (
     remove_spaces,
 )
 
-SHARD_ROWS = 5000
+SHARD_ROWS = 5000  # clips per train-*.parquet file, so no single file gets too big
 VALIDATION_PERCENT = 5
-TEST_PERCENT = 5
+TEST_PERCENT = 5  # the remaining 90% is train
 # <|startoftranscript|> <|km|> <|transcribe|> + <|notimestamps|> or two timestamps + <|endoftext|>
 SPECIAL_LABEL_TOKENS = 6
 
 
 def read_transcripts(name: str, keep_openslr_spaces: bool) -> List[Dict]:
+    """List the clips of one source from its `line_index.tsv`.
+
+    Each line of that file is `<clip id><delimiter><transcript>`, and the audio is at
+    `wavs/<clip id>.wav`. Audio isn't read here; `load_clip` does that in parallel later.
+
+    Args:
+        name: a key of `config.SOURCES`, e.g. "openslr42".
+        keep_openslr_spaces: keep OpenSLR 42's word-segmentation spaces (off by default).
+
+    Returns:
+        One dict per clip with `id` ("<source>/<clip id>"), `source`, normalized `text` and the
+        WAV `path`.
+    """
     folder, delimiter, _, _ = SOURCES[name]
     folder = SOURCE_ROOT / folder
     rows = []
+    # utf-8-sig drops the byte-order mark some of these files start with.
     for line in (folder / "line_index.tsv").read_text(encoding="utf-8-sig").splitlines():
         line = line.strip("\r\n")
         if not line.strip():
             continue
+        # Split at the first delimiter only; the transcript itself may contain spaces.
         clip_id, _, text = line.partition(delimiter)
         text = normalize_text(text)
         if name == "openslr42" and not keep_openslr_spaces:
@@ -62,6 +77,19 @@ def read_transcripts(name: str, keep_openslr_spaces: bool) -> List[Dict]:
 
 
 def load_clip(row: Dict) -> Dict:
+    """Read one WAV, check it, and re-encode it as 16 kHz mono FLAC.
+
+    Runs in worker processes (see `main`), so it reports problems in its return value
+    instead of raising.
+
+    Args:
+        row: a dict from `read_transcripts`.
+
+    Returns:
+        The finished dataset row (id, source, text, duration, audio), or `{"error": message}`
+        if the file can't be read, or `{"error": None}` if the clip is skipped on purpose
+        (empty transcript, or shorter than 0.3 s / longer than 30 s).
+    """
     try:
         array = load_audio(row["path"])
     except Exception as error:
@@ -74,9 +102,19 @@ def load_clip(row: Dict) -> Dict:
 
 
 def load_ddd_test() -> pd.DataFrame:
+    """Load the out-of-domain test set: 2,034 DDD clips from speakers no training source has.
+
+    It is never split or trained on; it only measures how well the model handles new voices.
+
+    Returns:
+        DataFrame with the same columns as the other splits (id, source="ddd_test", text,
+        duration, audio as 16 kHz FLAC).
+    """
     frame = pd.read_parquet(DDD_TEST_FILE)
     rows = []
     for _, row in tqdm(frame.iterrows(), total=len(frame), desc="ddd_test"):
+        # Audio is stored as {"bytes": ...} (Hugging Face datasets format); convert it like the
+        # other sources so every split has the same sampling rate and encoding.
         array = load_audio(row["audio"]["bytes"])
         rows.append({"id": f"ddd/{row['speaker_id']}/{row['sentence_id'].replace(' ', '')}", "source": "ddd_test",
                      "text": normalize_text(row["transcript"]), "duration": round(len(array) / SAMPLING_RATE, 3),
@@ -85,6 +123,19 @@ def load_ddd_test() -> pd.DataFrame:
 
 
 def split_of(text: str) -> str:
+    """Choose the split for a transcript: about 5% test, 5% validation, 90% train.
+
+    The choice depends only on the text (MD5 hash without spaces -> bucket 0-99), not on random
+    chance. So when several speakers read the same sentence, all of their clips land in the same
+    split, and the test sets never contain a sentence the model was trained on. It also gives
+    the same splits every time the dataset is rebuilt.
+
+    Args:
+        text: the clip's transcript.
+
+    Returns:
+        "test", "validation" or "train".
+    """
     bucket = int(hashlib.md5(remove_spaces(text).encode("utf-8")).hexdigest(), 16) % 100
     if bucket < TEST_PERCENT:
         return "test"
@@ -94,10 +145,18 @@ def split_of(text: str) -> str:
 
 
 def hours(frame: pd.DataFrame) -> float:
+    """Return the total audio length of `frame` in hours, rounded to 2 decimals."""
     return round(float(frame["duration"].sum()) / 3600, 2)
 
 
 def write_card(summary: Dict) -> None:
+    """Write `README.md` (the dataset card shown on Kaggle) next to the parquet files.
+
+    Args:
+        summary: the dict `main` saves as summary.json (clips and hours per split and per
+            source, plus each source's license and origin).
+    """
+    # Overview and a table of clips/hours per split.
     lines = [
         "# Khmer ASR mini dataset",
         "",
@@ -109,6 +168,7 @@ def write_card(summary: Dict) -> None:
     ]
     for split, info in summary["splits"].items():
         lines.append(f"| {split} | {info['clips']:,} | {info['hours']} |")
+    # Where each source came from and its license (two are research-only).
     lines += ["", "## Sources", "", "| Source | Clips | Hours | License | Origin |", "| --- | --- | --- | --- | --- |"]
     for name, info in summary["sources"].items():
         lines.append(f"| {name} | {info['clips']:,} | {info['hours']} | {info['license']} | {info['origin']} |")
@@ -124,34 +184,51 @@ def write_card(summary: Dict) -> None:
 
 
 def main() -> None:
+    """Build the whole dataset from the raw sources.
+
+    Steps: read all transcripts -> load and re-encode the audio in parallel -> drop unusable
+    clips -> drop labels too long for Whisper -> drop sentences that are in ddd_test ->
+    assign splits -> write the parquet files, summary.json and README.md.
+    """
     parser = argparse.ArgumentParser(description="Build the Khmer ASR mini dataset")
     parser.add_argument("--keep-openslr-spaces", action="store_true")
     parser.add_argument("--workers", type=int, default=8)
     args = parser.parse_args()
 
+    # 1. Read every source's transcripts, then decode/resample/encode the audio on several CPU
+    #    cores (one clip at a time is slow for ~20k clips).
     transcripts = [row for name in SOURCES for row in read_transcripts(name, args.keep_openslr_spaces)]
     with ProcessPoolExecutor(max_workers=args.workers) as pool:
         results = list(tqdm(pool.map(load_clip, transcripts, chunksize=64), total=len(transcripts), desc="Encoding clips"))
+    # 2. Keep the good clips and count the dropped ones (unreadable files vs. clips skipped for
+    #    empty text or bad length) for summary.json.
     errors = [result["error"] for result in results if "error" in result and result["error"]]
     frame = pd.DataFrame([result for result in results if "error" not in result])
     dropped = {"unreadable": len(errors), "empty_text_or_bad_length": len(results) - len(frame) - len(errors)}
     if errors:
         print(f"{len(errors)} unreadable clips, first: {errors[0]}")
 
+    # 3. Drop transcripts that need more than 448 tokens with the special tokens included:
+    #    Whisper's decoder can't output them, and Khmer uses many tokens per sentence.
     tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL)
     lengths = [len(ids) for ids in tokenizer(frame["text"].tolist(), add_special_tokens=False)["input_ids"]]
     too_long = pd.Series(lengths, index=frame.index) + SPECIAL_LABEL_TOKENS > MAX_LABEL_TOKENS
     dropped["over_label_token_limit"] = int(too_long.sum())
     frame = frame[~too_long]
 
+    # 4. Remove every clip whose sentence also appears in ddd_test, compared without spaces,
+    #    so the unseen-speaker test really contains nothing the model trained on.
     ddd_test = load_ddd_test()
     in_ddd_test = frame["text"].map(remove_spaces).isin(set(ddd_test["text"].map(remove_spaces)))
     dropped["text_also_in_ddd_test"] = int(in_ddd_test.sum())
     frame = frame[~in_ddd_test]
 
+    # 5. Assign train/validation/test by sentence (see split_of), then shuffle.
     frame["split"] = frame["text"].map(split_of)
     frame = frame.sample(frac=1, random_state=42).reset_index(drop=True)  # mix sources within shards
 
+    # 6. Write the parquet files. Delete old ones first, so leftover shards from a bigger previous
+    #    build aren't read as part of the new train split.
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     for old in DATA_DIR.glob("*.parquet"):
         old.unlink()
@@ -163,6 +240,8 @@ def main() -> None:
         frame[frame["split"] == split][columns].to_parquet(DATA_DIR / f"{split}.parquet", index=False)
     ddd_test[columns].to_parquet(DATA_DIR / "ddd_test.parquet", index=False)
 
+    # 7. Statistics for the report: clips and hours per split and per source, and why clips
+    #    were dropped. Saved as summary.json and turned into the README dataset card.
     splits = {split: frame[frame["split"] == split] for split in ("train", "validation", "test")}
     splits["ddd_test"] = ddd_test
     summary = {
